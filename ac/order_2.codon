@@ -1,0 +1,68 @@
+# Based on ArithmeticOrder2Stream.h from DeeZ by Hach, Numanagić, and Şahinalp (./deez/LICENSE)
+
+from copy import copy
+
+from .internals import widen_16_32, truncate_32_16
+from .arithmetic_coder import Range, Decoder, encode
+# can't seem to relative-import an entire module in Codon
+from .order_0 import Stats as Order0Stats, compress as order0_compress, decompress as order0_decompress
+
+
+class Stats:
+    _stats: list[list[Optional[Order0Stats]]]
+
+    def __init__(self, alphabet_size: int) -> None:
+        if not (1 <= alphabet_size <= 256):
+            raise ValueError("Invalid alphabet size")
+        self._stats = [[None for _ in range(alphabet_size)] for _ in range(alphabet_size)]
+
+    def __copy__(self) -> Stats:
+        alphabet_size = len(self._stats)
+        c = Stats(alphabet_size)
+
+        for i in range(alphabet_size):
+            for j in range(alphabet_size):
+                c._stats[i][j] = copy(c._stats[i][j]) if c._stats[i][j] is not None else None
+
+        return c
+
+    def get(self, context: tuple[u8, u8]) -> Order0Stats:
+        r = self._stats[int(context[0])][int(context[1])]
+
+        if r is None:
+            alphabet_size = len(self._stats)
+            r = self._stats[int(context[0])][int(context[1])] = Order0Stats(alphabet_size)
+
+        return r
+
+
+def compress(data: Generator[u8], initial_stats: Stats) -> Generator[u32]:
+    def ranges() -> Generator[Range]:
+        stats = copy(initial_stats)
+        context = (0u8, 0u8)
+
+        for b in data:
+            context_stats = stats.get(context)
+            yield context_stats.get_symbol_range(b)
+            context_stats.add(b)
+            context = (context[1], b)
+
+    yield from encode(ranges())
+
+
+def decompress(compressed: Generator[u32], initial_stats: Stats, data_len: int) -> Generator[u8]:
+    stats = copy(initial_stats)
+    decoder = Decoder(compressed)
+    context = (0u8, 0u8)
+
+    for _ in range(data_len):
+        context_stats = stats.get(context)
+
+        b_pos = decoder.peek(widen_16_32(context_stats.sum))
+        assert b_pos <= 0xffffu32
+        b, range_ = context_stats.get_position_range(truncate_32_16(b_pos))
+        decoder.shift(range_)
+        context_stats.add(b)
+        yield b
+
+        context = (context[1], b)

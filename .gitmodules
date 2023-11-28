@@ -1,0 +1,3 @@
+[submodule "deez"]
+	path = deez
+	url = https://github.com/sfu-compbio/deez

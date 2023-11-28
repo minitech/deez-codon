@@ -1,0 +1,158 @@
+diff --git a/Streams/ArithmeticCoder.cc b/Streams/ArithmeticCoder.cc
+index be98337..43b0138 100644
+--- a/Streams/ArithmeticCoder.cc
++++ b/Streams/ArithmeticCoder.cc
+@@ -10,16 +10,16 @@ ArithmeticCoder::ArithmeticCoder (void) {
+ ArithmeticCoder::~ArithmeticCoder (void) {
+ }
+ 
+-inline void ArithmeticCoder::initEncode (Array<uint8_t> *o) {
++void ArithmeticCoder::initEncode (Array<uint8_t> *o) {
+ 	dataO = o;
+ }
+ 
+-inline void ArithmeticCoder::initDecode (uint8_t *o, size_t osz) {
++void ArithmeticCoder::initDecode (uint8_t *o, size_t osz) {
+ 	dataI = o;
+ 	getbit(), getbit(), getbit();
+ }
+ 
+-inline int ArithmeticCoder::setbit (void) {
++int ArithmeticCoder::setbit (void) {
+ 	int w = 0;
+ 
+ 	rc_Carry = (Low >> 63) & 1;
+@@ -40,13 +40,13 @@ inline int ArithmeticCoder::setbit (void) {
+ 	return w;
+ }
+ 
+-inline void ArithmeticCoder::getbit (void) {
++void ArithmeticCoder::getbit (void) {
+ 	rc_Cache = *(uint32_t*)dataI; dataI += sizeof(uint32_t);
+ 	Code = (Code << 32) + rc_Carry + (rc_Cache >> 1);
+ 	rc_Carry = rc_Cache << 31;
+ }
+ 
+-inline int ArithmeticCoder::encode (uint32_t cumFreq, uint32_t freq, uint32_t totFreq) {
++int ArithmeticCoder::encode (uint32_t cumFreq, uint32_t freq, uint32_t totFreq) {
+ 	Range /= totFreq;
+ 	Low += Range * cumFreq;
+ 	Range *= freq;
+@@ -57,12 +57,12 @@ inline int ArithmeticCoder::encode (uint32_t cumFreq, uint32_t freq, uint32_t to
+ 	return 0;
+ }
+ 
+-inline uint32_t ArithmeticCoder::getFreq (uint32_t totFreq) {
++uint32_t ArithmeticCoder::getFreq (uint32_t totFreq) {
+ 	return Code / (Range / totFreq);
+ }
+ 
+ //uint32_t symbol = model.find(count);
+-inline void ArithmeticCoder::decode (uint32_t cumFreq, uint32_t freq, uint32_t totFreq) {	
++void ArithmeticCoder::decode (uint32_t cumFreq, uint32_t freq, uint32_t totFreq) {
+ 	Range /= totFreq;
+ 	Code -= Range * cumFreq;
+ 	Range *= freq;
+@@ -72,7 +72,7 @@ inline void ArithmeticCoder::decode (uint32_t cumFreq, uint32_t freq, uint32_t t
+ 	}
+ }
+ 
+-inline void ArithmeticCoder::flush (void) {
++void ArithmeticCoder::flush (void) {
+ 	Low++;
+ 	setbit();
+ 	setbit();
+diff --git a/Streams/ArithmeticCoder.h b/Streams/ArithmeticCoder.h
+index af6667a..4537353 100644
+--- a/Streams/ArithmeticCoder.h
++++ b/Streams/ArithmeticCoder.h
+@@ -4,9 +4,12 @@
+ // Based on cld-c.inc from aridemo6.rar package available at http://compression.ru/sh/aridemo6.rar
+ // Dword-oriented Rangecoder by Eugene D. Shelwien -- Plain C++
+ 
++#include <cassert>
++#include <sstream>
++#include <string>
+ #include <vector>
+ #include <zlib.h>
+-#include "../Common.h"
++#include "../Array.h"
+ 
+ class ArithmeticCoder {
+ 	uint64_t Range;
+@@ -26,17 +29,17 @@ private:
+ 	void getbit (void);
+ 
+ public:
+-	virtual int encode (uint32_t cumFreq, uint32_t freq, uint32_t totFreq);
+-	virtual void decode (uint32_t cumFreq, uint32_t freq, uint32_t totFreq);
+-	virtual uint32_t getFreq (uint32_t);
+-	virtual void flush (void);
++	int encode (uint32_t cumFreq, uint32_t freq, uint32_t totFreq);
++	void decode (uint32_t cumFreq, uint32_t freq, uint32_t totFreq);
++	uint32_t getFreq (uint32_t);
++	void flush (void);
+ 
+-	virtual void initEncode (Array<uint8_t> *o);
+-	virtual void initDecode (uint8_t *o, size_t osz);
++	void initEncode (Array<uint8_t> *o);
++	void initDecode (uint8_t *o, size_t osz);
+ 
+ public:
+ 	ArithmeticCoder ();
+ 	~ArithmeticCoder (void);
+ };
+-	
++
+ #endif // ArithmeticCoder_H
+diff --git a/Streams/ArithmeticOrder0Stream.h b/Streams/ArithmeticOrder0Stream.h
+index c4a6d14..18dc03a 100644
+--- a/Streams/ArithmeticOrder0Stream.h
++++ b/Streams/ArithmeticOrder0Stream.h
+@@ -56,16 +56,16 @@ protected:
+ 	}
+ 
+ public:
+-	void encode (uint8_t c, ArithmeticCoder *ac) 
++	void encode (uint8_t c, ArithmeticCoder *ac)
+ 	{
+ 		assert(c < AS);
+ 		uint32_t l = 0, i;
+ 		for (i = 0; i < AS; i++)
+ 			if (stats[i].sym == c) break;
+ 			else l += stats[i].freq;
+-		
++
+ 		encoded += ac->encode(l, stats[i].freq, sum);
+-		sum++; 
++		sum++;
+ 		stats[i].freq++;
+ 
+ 		if (i && sum % RescaleFactor == 0) {
+diff --git a/Utils.h b/Utils.h
+index 0ba1017..a832e87 100644
+--- a/Utils.h
++++ b/Utils.h
+@@ -38,15 +38,15 @@ inline std::vector<std::string> split (std::string s, char delim)
+ 	return elems;
+ }
+ 
+-inline uint64_t zaman() 
+-{
+-	struct timeval t;
+-	gettimeofday(&t, 0);
+-	return (t.tv_sec * 1000000ll + t.tv_usec);
+-}
+-
+ // #define ZAMAN
+ #ifdef ZAMAN
++	inline uint64_t zaman()
++	{
++		struct timeval t;
++		gettimeofday(&t, 0);
++		return (t.tv_sec * 1000000ll + t.tv_usec);
++	}
++
+ 	class __zaman__ { // crazy hack for gcc 5.1
+ 	public:
+ 		std::map<std::string, uint64_t> times;

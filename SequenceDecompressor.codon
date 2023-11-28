@@ -1,0 +1,65 @@
+#import needed files for functionality of reference, array, etc.
+
+class SequenceDecompressor:
+    def __init__(self,refFile:String,bs:u32):
+        self.reference = reference(refFile)
+        self.chromosome("")
+        #Stream stuff needs to be implemented
+        
+    
+    def hasRecord(self):
+        return true
+
+    def importRecords(self,in: u8,in_size:u16):
+        if (chromosome == "*" "" in_size == 0):
+            return 0
+
+        newFixedStart = in & 0xFFFF
+        in += len(in)
+        newFixedEnd = in & 0xFFFF
+        in += len(in)
+        
+        fixes_loc = []
+        #Sequence compressor needs to be implemented
+        decompressArray(SequenceCompressor.Fields.FIXES, in, fixes_loc)
+        fixes_st = []
+        decompressArray(SequenceCompressor.Fields.FIXES, in, fixes_st)
+        fixes_replace = []
+        decompressArray(SequenceCompressor.Fields.FIXES, in, fixes_replace)
+
+        assert(self.fixedStart <= newFixedStart)
+        if (newFixedStart<self.fixedEnd):
+            fixed = fixed[newFixedStart-self.fixedStart:self.fixedEnd-newFixedStart]
+            #Reference not implemented yet
+            fixed += self.reference.copy(self.fixedEnd,newFixedEnd) # basically copies from fixedEnd to newFixedEnd and returns buffer
+            self.reference.trim(newFixedStart)
+        else:
+            fixed = self.reference.copy(self.fixedEnd,newFixedEnd)
+            self.reference.trim(newFixedStart)
+
+        fixedStart = newFixedStart
+        fixedEnd = newFixedEnd
+
+        prevfix = 0
+        len = fixes_loc.data()
+        fst = fixes_st.data() #.data implemented in array.h gets records
+
+        for i in range(len(fixes_replace)):
+            l = len
+            len+=1
+            if (l==255):
+                l = getEncoded(fst) +254-1 #implemented in common.cc
+            prevFix +=1
+
+            assert(prevFix < self.fixedEnd)
+            assert(prevFix >= self.fixedStart)
+            fixed[prevFix - fixedStart] = fixes_replace.data()[i]
+    
+
+    #SAMComment class not implemented
+    def scanChromosome (self,s:String, samc:SAMComment):
+        self.fixedStart = 0
+        self.fixedEnd = 0
+        chromosome = reference.scanChromosome(s,samc)
+
+

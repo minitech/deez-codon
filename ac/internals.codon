@@ -1,0 +1,14 @@
+def widen(x: u32) -> u64:
+    return u64(int(x))  # yikes!
+
+
+def truncate(x: u64) -> u32:
+    return u32(int(x))
+
+
+def widen_16_32(x: u16) -> u32:
+    return u32(int(x))
+
+
+def truncate_32_16(x: u32) -> u16:
+    return u16(int(x))

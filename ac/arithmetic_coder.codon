@@ -1,0 +1,108 @@
+# Based on ArithmeticCoder.cc from DeeZ by Hach, Numanagić, and Şahinalp (./deez/LICENSE), itself based on cld-c.inc from aridemo6.rar package available at http://compression.ru/sh/aridemo6.rar / Dword-oriented Rangecoder by Eugene D. Shelwien -- Plain C++
+
+from itertools import repeat
+
+from .internals import widen, truncate
+
+
+@tuple
+class Range:
+    start: u32
+    """
+    The start of this subrange.
+    """
+
+    size: u32
+    """
+    The size of this subrange.
+    """
+
+    total: u32
+    """
+    The size of the range that this is a subrange of.
+    """
+
+
+# Codon doesn't seem to support `nonlocal`
+class _EncodeState:
+    range_: u64 = 0x7fff_ffff_ffff_ffffu64
+
+    # The concatenated hold || all1_words x 0xffff_ffff || low form the low end of the current range (what hasn't yet been yielded)
+    hold: u32 = 0u32
+    all1_words: u32 = 0u32  # The number of 32-bit words that are all 1 between `hold` and `low` (TODO: can handle O(GB) unlikely inputs?)
+    low: u64 = 0u64  # 63 bits and a temporary carry
+
+
+def encode(stream: Generator[Range]) -> Generator[u32]:
+    state = _EncodeState()
+    assert state.range_ == 0x7fff_ffff_ffff_ffffu64  # see `Decoder.__init__`
+
+    def pop_high() -> Generator[u32]:
+        # 32 bits (one word) of range prefix have been determined; apply them
+        if state.low & (1u64 << 63u64):
+            # carry propagates up, turning all-1 words to 0
+            yield state.hold + 1u32
+            yield from repeat(0u32, int(state.all1_words))
+            state.hold = truncate(state.low >> 31u64)  # high 32 bits of `low` (carry is truncated off)
+            state.all1_words = 0u32
+        elif state.low < 0x7fff_ffff_8000_0000u64:
+            # not all of the high 32 bits are set, so there will never be a carry; remove the high 31 bits from low
+            yield state.hold
+            yield from repeat(0xffff_ffffu32, int(state.all1_words))
+            state.hold = truncate(state.low >> 31u64)  # high 32 bits of `low`
+            state.all1_words = 0u32
+        else:
+            state.all1_words += 1u32
+
+        # keep the remaining low 31 bits of `low` now that the high 32 have been applied
+        state.low &= 0x7fff_ffffu64
+
+        # and get ready for the next 32
+        state.low <<= 32u64
+        state.range_ <<= 32u64
+
+    for r in stream:
+        state.range_ //= widen(r.total)
+        state.low += state.range_ * widen(r.start)
+        state.range_ *= widen(r.size)
+
+        if state.range_ < 0x8000_0000u64:
+            yield from pop_high()
+
+    state.low += 1u64
+    yield from pop_high()  # out <- hold <- low
+    yield from pop_high()  # out <- hold <- low
+    yield from pop_high()  # out <- hold
+
+
+class Decoder:
+    stream: Generator[u32]
+    code: u64
+    trail: u32  # one bit after the LSB of `code` is stored as MSB of `trail`: 32-bit windows on the input offset by -1 bit
+    range_: u64
+
+    def __init__(self, stream: Generator[u32]) -> None:
+        self.stream = stream
+        self.code = 0u64
+        self.trail = 0u32
+        self.range_ = 0x7fff_ffff_ffff_ffffu64  # XXX: if you try to initialize this at the class level, Codon will SILENTLY NOT DO IT, even though it did for _EncodeState
+        self.push_low()
+        self.push_low()
+        self.push_low()
+
+    def push_low(self) -> None:
+        w = next(self.stream)
+        self.code = (self.code << 32u64) | widen(self.trail) | widen(w >> 1u32)
+        self.trail = w << 31u32
+
+    def peek(self, total: u32) -> u32:
+        return truncate(self.code // (self.range_ // widen(total)))
+
+    def shift(self, head: Range) -> u32:
+        self.range_ //= widen(head.total)
+        self.code -= self.range_ * widen(head.start)
+        self.range_ *= widen(head.size)
+
+        if self.range_ < 0x8000_0000u64:
+            self.push_low()
+            self.range_ <<= 32u64

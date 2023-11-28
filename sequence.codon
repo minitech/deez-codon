@@ -1,0 +1,127 @@
+class GenomeStats:
+    stats: List[int]
+
+    def __init__(self, stats: List[int]):
+        self.stats = [[0,0,0,0,0,0]]
+
+    def getDNAValue(self, ch: int):
+        c = [5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,
+            5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,
+            5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,0,5,
+            5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,
+            5,1,5,2,5,5,5,3,5,5,5,5,5,5,5,5,5,
+            5,5,5,5,4,5,5,5,5,5,5,5,5,5,5,5,5,
+            5,1,5,2,5,5,5,3,5,5,5,5,5,5,5,5,5,
+            5,5,5,5,4,5,5,5,5,5,5,5,5,5,5,5,5]
+        return c[ch]    
+
+    def updateGenomeLoc (self,loc: int, ch: int):
+        assert(loc<len(self.stats))
+        self.stats[loc][self.getDNAValue(ch)]+=1
+
+    def update (self, g: int, threadStats: int, i: int):
+        for j in range(6):
+            self.stats[g][j] += threadStats.stats[i][j]
+
+    def max_pos(self,i: int):
+        maxVal = -1
+        pos = -1
+        for j in range(1,6):
+            if self.stats[i][j] > maxVal:
+                maxVal = self.stats[i][j]
+        return pos
+
+    def size(self):
+        return len(self.stats)
+
+
+class GenomeStatsSSE:
+    invert: int
+    getSSEvalueCache: List[int]
+    statsSSE: List[int]
+
+    def __init__(self, statsSSE: List[int], getSSEEvalueCache: List[int], invert: int):
+        self.statsSSE = []
+        self.getSSEvalueCache = []
+        self.invert = 0
+
+    def getDNAValue(self, ch: int):
+            c = [5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,
+                5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,
+                5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,0,5,
+                5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,
+                5,1,5,2,5,5,5,3,5,5,5,5,5,5,5,5,5,
+                5,5,5,5,4,5,5,5,5,5,5,5,5,5,5,5,5,
+                5,1,5,2,5,5,5,3,5,5,5,5,5,5,5,5,5,
+                5,5,5,5,4,5,5,5,5,5,5,5,5,5,5,5,5]
+            return c[ch]  
+      
+    def updateGenomeLoc (self,loc: int, ch: int):
+        assert(loc<len(self.statsSSE))
+        self.statsSSE[loc] = self.statsSSE[loc] + self.getSSEvalueCache[self.getDNAValue(ch)]
+
+    def update (self, g: int, threadStats: int, i: int):
+        self.statsSSE[g] = self.statsSSE[g] + threadStats.get()
+
+    def max_pos(self,i: int):
+        maxVal = -1
+        pos = -1
+        for j in range(1,6):
+            if self.stats[i][j] > maxVal:
+                maxVal = self.stats[i][j]
+        return pos
+
+def size(self):
+    return len(self.stats)
+
+class SequenceCompressor():
+
+    reference: None
+    fixesLoc: List[int]
+    fixesReplace: List[int]
+    fixesLocSt: List[int]
+    chromosome: str 
+    fixed: list[str]
+    fixedStart: int
+    fixedEnd: int
+    maxEnd: int
+
+    def __init__(self, reference: None, fixesLoc: List[int],
+                  fixesReplace: List[int], fixesLocSt: List[int],
+                    chromosome: str, fixed: List[str], fixedStart: int, fixedEnd: int, maxEnd: int):
+        self.reference = None
+        self.fixesLoc = []
+        self.fixesReplace = []
+        self.fixesLocSt = []
+        self.chromosome = ""
+        self.fixed = []
+        self.fixedStart = 0
+        self.fixedEnd = 0
+        self.maxEnd = 0
+
+    def getIndexData(self,out: List[int]):
+        out.clear()
+
+    def getChromosome(self):
+        return self.chromosome
+    
+    def newStats(self, i: int):
+        return 
+
+    def getReference(self):
+        return self.reference
+
+class SequenceDecompressor:
+    def __init__(self):
+        self.reference = None
+        self.chromosome = ""
+        self.fixed = ""
+        self.fixedStart = 0
+        self.fixedEnd = 0
+
+    def getChromosome(self):
+        return self.chromosome
+
+    def getReference(self):
+        return self.reference
+    

@@ -1,0 +1,133 @@
+# Based on ArithmeticOrder0Stream.h from DeeZ by Hach, Numanagić, and Şahinalp (./deez/LICENSE)
+
+from copy import copy
+
+from .internals import widen_16_32, truncate_32_16
+from .arithmetic_coder import Range, Decoder, encode
+
+
+REARRANGE_EVERY = 32u16
+SUM_LIMIT = 1u16 << 15u16
+
+
+class Stat:
+    symbol: u8
+    frequency: u16
+
+    def __init__(self, symbol: u8, frequency: u16) -> None:
+        self.symbol = symbol
+        self.frequency = frequency
+
+    def __copy__(self) -> Stat:
+        return Stat(
+            symbol=self.symbol,
+            frequency=self.frequency,
+        )
+
+
+class Stats:
+    _stats: list[Stat]
+    sum: u16
+
+    def __init__(self, size: int) -> None:
+        if not (1 <= size <= 256):
+            raise ValueError("Invalid alphabet size")
+        self._stats = [Stat(symbol=u8(i), frequency=1u16) for i in range(size)]
+        self.sum = u16(size)
+
+    def __copy__(self) -> Stats:
+        c = Stats(len(self._stats))
+        c._stats[:] = map(copy, self._stats)
+        c.sum = self.sum
+        return c
+
+    def get_symbol_range(self, symbol: u8) -> Range:
+        start = 0u16
+        for stat in self._stats:
+            if stat.symbol == symbol:
+                break
+            start += stat.frequency
+        else:
+            raise ValueError(f"Symbol {symbol} out of range")
+
+        return Range(
+            start=widen_16_32(start),
+            size=widen_16_32(stat.frequency),
+            total=widen_16_32(self.sum),
+        )
+
+    def get_position_range(self, position: u16) -> tuple[u8, Range]:
+        start = 0u16
+        for stat in self._stats:
+            if position < start + stat.frequency:
+                range_ = Range(
+                    start=widen_16_32(start),
+                    size=widen_16_32(stat.frequency),
+                    total=widen_16_32(self.sum),
+                )
+                return (stat.symbol, range_)
+            start += stat.frequency
+
+        raise ValueError("Position out of range")
+
+    def add(self, symbol: u8) -> None:
+        i: int
+
+        for i, stat in enumerate(self._stats):
+            if stat.symbol == symbol:
+                stat.frequency += 1u16
+                break
+        else:
+            raise ValueError("Symbol out of range")
+
+        self.sum += 1u16
+
+        if i > 0 and self.sum % REARRANGE_EVERY == 0u16:
+            j = i - 1
+            while j > 0 and self._stats[i].frequency > self._stats[j].frequency: j -= 1
+            self._stats[i], self._stats[j + 1] = self._stats[j + 1], self._stats[i]
+
+        if self.sum > SUM_LIMIT:
+            self.rescale()
+
+    def rescale(self) -> None:
+        self.sum = 0u16
+
+        for i, stat in enumerate(self._stats):
+            # halve rounding up; important for, at least, making sure no probability goes to zero
+            stat.frequency -= stat.frequency >> 1u16
+            self.sum += stat.frequency
+
+            # TODO: what does this do, shuffle more frequent symbols earlier for faster linear scan? why not sort? (does it create subscale precision for another compression pass? why not more precision?)
+            j = i - 1
+            while j > 0 and stat.frequency > self._stats[j].frequency: j -= 1
+            self._stats[i], self._stats[j + 1] = self._stats[j + 1], self._stats[i]
+
+
+def compress(data: list[u8], initial_stats: Stats) -> Generator[u32]:
+    def ranges() -> Generator[Range]:
+        stats = copy(initial_stats)
+
+        for b in data:
+            yield stats.get_symbol_range(b)
+            stats.add(b)
+
+    if len(data) > 0xffff_ffff:
+        raise ValueError("Data too long to compress")
+
+    yield u32(len(data))
+    yield from encode(ranges())
+
+
+def decompress(compressed: Generator[u32], initial_stats: Stats) -> Generator[u8]:
+    stats = copy(initial_stats)
+    data_len = next(compressed)
+    decoder = Decoder(compressed)
+
+    for _ in range(int(data_len)):
+        b_pos = decoder.peek(widen_16_32(stats.sum))
+        assert b_pos <= 0xffffu32
+        b, range_ = stats.get_position_range(truncate_32_16(b_pos))
+        decoder.shift(range_)
+        stats.add(b)
+        yield b

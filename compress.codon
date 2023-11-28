@@ -1,0 +1,51 @@
+import sys
+from bio import SAM
+
+from .ac.order_2 import Stats, compress, decompress
+
+
+SCAN_FOR_QUALITY_OFFSET = False
+
+
+# Based on QualityScoreCompressor.cc from DeeZ by Hach, Numanagić, and Şahinalp (./deez/LICENSE)
+def shrink(qual: str) -> str:
+    """
+    Removes repeats at the end of a quality string.
+    """
+    if qual in ("", "*"):
+        return ""
+
+    return qual.rstrip(qual[-1]) + qual[-1]
+
+
+def get_offset(qual: str) -> int:
+    m = ord(min(qual))
+    return (
+        33 if m < 59 else
+        59 if m < 64 else
+        64
+    )
+
+
+if len(sys.argv) != 3:
+    print(
+        "Usage:\n"
+        "  compress <input> <output>",
+        file=sys.stderr,
+    )
+    raise SystemExit(1)
+
+
+if SCAN_FOR_QUALITY_OFFSET:
+    qual_offset = min(get_offset(r.qual) for r in SAM(sys.argv[1]))
+else:
+    qual_offset = 33
+
+qual_range = 96
+
+print(f"Using quality offset {qual_offset}", file=sys.stderr)
+
+with open(sys.argv[2], "wb") as out:
+    for w_ in compress((u8(ord(qc) - qual_offset) for r in SAM(sys.argv[1]) for qc in r.qual), Stats(qual_range)):
+        w = int(w_)
+        out.write(chr(w & 0xff) + chr((w >> 8) & 0xff) + chr((w >> 16) & 0xff) + chr(w >> 24))

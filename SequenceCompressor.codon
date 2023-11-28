@@ -1,0 +1,138 @@
+class SequenceCompressor:
+    def __init__(self, refFile: str):
+        self.reference = refFile
+        self.fixesLoc = []
+        self.fixesLocSt = []
+        self.maxEnd = 0
+
+    def updateBoundary(self, loc):
+        return max(self.maxEnd, loc)
+
+    def outputRecords[T](self, records: List[T], out: List[int], out_offset: int, k: int):
+        if self.chromosome == '*':
+            return
+
+        out.append(self.fixedStart)
+        out.append(self.fixedEnd)
+        out_offset += 2
+
+        compressorArray(streams['FIXES'], self.fixesLoc, out, out_offset)
+        compressorArray(streams['FIXES'], self.fixesLocSt, out, out_offset)
+        compressorArray(streams['FIXES'], self.fixesReplace, out, out_offset)
+
+        self.fixesLoc.clear()
+        self.fixesLocSt.Clear()
+        self.fixesReplace.clear()
+
+    def operator(self, pos: int):
+        #Check pos ranges
+        return pos - self.fixedStart
+
+    def scanChromosome(self):
+        #check ranges
+        self.fixed.clear()
+        self.fixedStart = self.fixedEnd = self.maxEnd = 0
+        self.chromosome = self.reference.scanChromosomes(s, samComment)
+
+    def applyFixesThread[T, U](self, records: List[T], editOps: List[U], start: int, end: int):
+        for i in range(start, end):
+            seq = records[i].getSequence() #Define Sequence
+            if editOps[i].first == "*" or seq[0] == "*":
+                continue
+            genPos = editOps[i].start
+            seqPos = 0
+            for op in editOps.start:
+                match op.first:
+                    case 'M':
+                        pass
+                    case '=':
+                        pass
+                    case 'X':
+                        genPos = 0
+                        for i in range(op.second):
+                            self.stats.updateGenomeLoc(genPos, self.fixedStart, '.')
+
+                        break
+                    case 'I':
+                        pass
+                    case 'S':
+                        seqPos += op.second
+                        break
+
+    def applyFixes[T](self, nextBlockBegin: int, records: List[T], editOps,start_s: int, end_s: int, end_e: int, fs: int, fe: int):
+        if len(editOps) == 0:
+            return 0
+
+        if self.chromosome != '*':
+            self.fixingStart = self.fixedEnd
+
+            if self.maxEnd > fixedEnd:
+                newFixedEnd = self.maxEnd
+                newFixedStart = editOps[0].start
+                assert(fixedStart<=newFixedStart)
+
+                if (len(self.fixed) and newFixedStart < self.fixedEnd):
+                    fixed = fixed[newFixedStart-fixedStart:fixedEnd - newFixedStart]
+                    fixed += reference[fixedEnd:newFixedEnd]
+                    reference = reference[fixedEnd:]
+                else:
+                    fixed = reference[newFixedStart:newFixedEnd]
+                    reference = reference[fixedEnd:]
+
+                self.fixedStart = newFixedStart
+                self.fixedEnd = newfixedEnd
+
+
+        #stats = GenomeStatsSSE.newStats(self.fixedEnd-self.fixedStart)
+
+        maxSz = len(editOps)
+        sz = maxSz / 2
+
+        for i in len(self.optThreads):
+            ti = i
+            if ti == 0:
+                self.applyFixesThread(self.records,editOps,self.stats,self.fixedStart,self.start,self.end)
+                return None
+            if self.start >= len(editOps):
+                return None
+
+            genomeStart = editOps[start].start
+            genomeEnd = 0
+            i = self.start
+            while i < self.end:
+                genomeEnd = max(genomeEnd,editOps[i].end)
+
+            self.applyFixesThread(self.records,editOps,self.stats,self.fixedStart,self.start,self.end)
+
+
+            for i in range(genomeEnd-genomeStart):
+                stats.update(i+genomeStart - fixedStart,genomeEnd-genomeStart ,i)
+
+
+        fixedPrev = 0
+        self.fixesLoc.clear()
+        self.fixesLocSt.clear()
+        self.fixesReplace.clear()
+
+        for i in range(self.fixedEnd-self.fixedStart):
+            p = fixedStart + i - fixedPrev
+            if p >= 254:
+                self.fixesLoc.append(255)
+                addEncoded(p-254+1,fixesLocSt)
+            else:
+                fixesLoc.append(p)
+
+            fixedPrev = fixedStart + i
+            self.fixed[i] = ".ACTGTN"[pos]
+            fixesReplace.append(self.fixed[i])
+
+        bound = 0
+        for i in range(len(editOps)) and editOps[i].end <= self.fixedEnd:
+            bound+=1
+        start_s = editOps[0].start
+        end_s = editOps[bound -1].start
+        end_e = editOps[bound - 1].end
+        fs = self.fixedStart
+        fe = self.fixedEnd
+
+        return bound
