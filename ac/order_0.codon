@@ -10,82 +10,69 @@ REARRANGE_EVERY = 32u16
 SUM_LIMIT = 1u16 << 15u16
 
 
-class Stat:
-    symbol: u8
-    frequency: u16
+def _prefix_sum[T](values: list[T], count: int) -> T:
+    s = T(0)
 
-    def __init__(self, symbol: u8, frequency: u16) -> None:
-        self.symbol = symbol
-        self.frequency = frequency
+    for i in range(count):
+        s += values[i]
 
-    def __copy__(self) -> Stat:
-        return Stat(
-            symbol=self.symbol,
-            frequency=self.frequency,
-        )
+    return s
 
 
 class Stats:
-    _stats: list[Stat]
+    _symbols: list[u8]
+    _frequencies: list[u16]
     sum: u16
 
     def __init__(self, size: int) -> None:
         if not (1 <= size <= 256):
             raise ValueError("Invalid alphabet size")
-        self._stats = [Stat(symbol=u8(i), frequency=1u16) for i in range(size)]
+        self._symbols = [u8(i) for i in range(size)]
+        self._frequencies = [1u16] * size
         self.sum = u16(size)
 
     def __copy__(self) -> Stats:
-        c = Stats(len(self._stats))
-        c._stats[:] = map(copy, self._stats)
+        c = Stats(len(self._symbols))
+        c._symbols[:] = self._symbols
+        c._frequencies[:] = self._frequencies
         c.sum = self.sum
         return c
 
     def get_symbol_range(self, symbol: u8) -> Range:
-        start = 0u16
-        for stat in self._stats:
-            if stat.symbol == symbol:
-                break
-            start += stat.frequency
-        else:
-            raise ValueError(f"Symbol {symbol} out of range")
+        i = self._symbols.index(symbol)
+        start = _prefix_sum(self._frequencies, i)
 
         return Range(
             start=widen_16_32(start),
-            size=widen_16_32(stat.frequency),
+            size=widen_16_32(self._frequencies[i]),
             total=widen_16_32(self.sum),
         )
 
     def get_position_range(self, position: u16) -> tuple[u8, Range]:
         start = 0u16
-        for stat in self._stats:
-            if position < start + stat.frequency:
+        for i, frequency in enumerate(self._frequencies):
+            if position < start + frequency:
                 range_ = Range(
                     start=widen_16_32(start),
-                    size=widen_16_32(stat.frequency),
+                    size=widen_16_32(frequency),
                     total=widen_16_32(self.sum),
                 )
-                return (stat.symbol, range_)
-            start += stat.frequency
+                return (self._symbols[i], range_)
+            start += frequency
 
         raise ValueError("Position out of range")
 
     def add(self, symbol: u8) -> None:
-        i: int
-
-        for i, stat in enumerate(self._stats):
-            if stat.symbol == symbol:
-                stat.frequency += 1u16
-                break
-        else:
-            raise ValueError("Symbol out of range")
-
+        i = self._symbols.index(symbol)
+        self._frequencies[i] += 1u16
         self.sum += 1u16
 
         if i > 0 and self.sum % REARRANGE_EVERY == 0u16:
+            # make the input closer to sorted so linear scans are faster
             j = i - 1
-            while j > 0 and self._stats[i].frequency > self._stats[j].frequency: j -= 1
-            self._stats[i], self._stats[j + 1] = self._stats[j + 1], self._stats[i]
+            while j > 0 and self._frequencies[i] > self._frequencies[j]: j -= 1
+            self._symbols[i], self._symbols[j + 1] = self._symbols[j + 1], self._symbols[i]
+            self._frequencies[i], self._frequencies[j + 1] = self._frequencies[j + 1], self._frequencies[i]
 
         if self.sum > SUM_LIMIT:
             self.rescale()
@@ -93,15 +80,15 @@ class Stats:
     def rescale(self) -> None:
         self.sum = 0u16
 
-        for i, stat in enumerate(self._stats):
+        for i in range(len(self._frequencies)):
             # halve rounding up; important for, at least, making sure no probability goes to zero
-            stat.frequency -= stat.frequency >> 1u16
-            self.sum += stat.frequency
+            self._frequencies[i] -= self._frequencies[i] >> 1u16
+            self.sum += self._frequencies[i]
 
-            # TODO: what does this do, shuffle more frequent symbols earlier for faster linear scan? why not sort? (does it create subscale precision for another compression pass? why not more precision?)
             j = i - 1
-            while j > 0 and stat.frequency > self._stats[j].frequency: j -= 1
-            self._stats[i], self._stats[j + 1] = self._stats[j + 1], self._stats[i]
+            while j > 0 and self._frequencies[i] > self._frequencies[j]: j -= 1
+            self._symbols[i], self._symbols[j + 1] = self._symbols[j + 1], self._symbols[i]
+            self._frequencies[i], self._frequencies[j + 1] = self._frequencies[j + 1], self._frequencies[i]
 
 
 def compress(data: list[u8], initial_stats: Stats) -> Generator[u32]:
